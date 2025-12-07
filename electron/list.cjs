@@ -1,3 +1,4 @@
+const HID = require('node-hid');
 
 console.log("Attempting to read HID devices…");
 

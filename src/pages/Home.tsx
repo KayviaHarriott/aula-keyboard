@@ -14,11 +14,11 @@ export const Home = () => {
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-white mb-2">Aula Keyboard Control Center</h1>
           <p className="text-gray-300 text-lg">macOS Control Panel</p>
-          {message && (
+          {/* {message && (
             <div className="mt-4 inline-block bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg animate-pulse">
               {message}
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Control Center */}
