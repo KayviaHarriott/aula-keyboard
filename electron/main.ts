@@ -3,13 +3,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import HID from 'node-hid';
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let HID: any = null;
 
 // Aula F99 Pro USB IDs (from KB.ini)
 const AULA_VID = 0x258a;
@@ -19,6 +19,16 @@ const AULA_PID = 0x010C;
 let currentColor = 0;
 let currentSpeed = 2;
 let currentMode = 0;
+
+// Load node-hid dynamically
+async function loadHID() {
+  try {
+    HID = await import('node-hid');
+    console.log('node-hid loaded successfully');
+  } catch (error) {
+    console.error('Failed to load node-hid:', error);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,7 +54,8 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await loadHID();
   createWindow();
 
   app.on('activate', () => {
@@ -64,8 +75,12 @@ app.on('window-all-closed', () => {
 
 function findAulaKeyboard() {
   try {
-    const devices = HID.devices();
-    const keyboard = devices.find(d => d.vendorId === AULA_VID && d.productId === AULA_PID);
+    if (!HID) {
+      console.error('node-hid not loaded');
+      return null;
+    }
+    const devices = HID.default ? HID.default.devices() : HID.devices();
+    const keyboard = devices.find((d: any) => d.vendorId === AULA_VID && d.productId === AULA_PID);
     return keyboard;
   } catch (error) {
     console.error('Error finding keyboard:', error);
@@ -75,12 +90,17 @@ function findAulaKeyboard() {
 
 function sendCommandToKeyboard(data: number[]) {
   try {
+    if (!HID) {
+      return { success: false, error: 'node-hid not loaded' };
+    }
+    
     const deviceInfo = findAulaKeyboard();
     if (!deviceInfo || !deviceInfo.path) {
       return { success: false, error: 'Keyboard not found' };
     }
 
-    const device = new HID.HID(deviceInfo.path);
+    const HIDClass = HID.default ? HID.default.HID : HID.HID;
+    const device = new HIDClass(deviceInfo.path);
     
     // Prepare the command packet (typically 64 bytes for HID)
     const packet = new Array(64).fill(0);

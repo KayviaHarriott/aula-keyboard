@@ -12,6 +12,13 @@ export default defineConfig({
     electron([
       {
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['node-hid']
+            }
+          }
+        }
       },
       {
         entry: 'electron/preload.ts',
