@@ -2,10 +2,86 @@ import { useState } from 'react';
 
 export const Home = () => {
   const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleControlFunction = (fn: string) => {
-    setMessage(`Function activated: ${fn}`);
-    setTimeout(() => setMessage(''), 2000);
+  const handleChangeColor = async () => {
+    setIsLoading(true);
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.changeColor();
+        if (result.success) {
+          setMessage('✅ Color changed successfully!');
+        } else {
+          setMessage(`❌ Error: ${result.error}`);
+        }
+      } else {
+        setMessage('🌐 Running in browser mode - Electron features disabled');
+      }
+    } catch (error) {
+      setMessage(`❌ Error: ${error}`);
+    }
+    setIsLoading(false);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleBreathingFaster = async () => {
+    setIsLoading(true);
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.breathingSpeed('faster');
+        if (result.success) {
+          setMessage('✅ Breathing speed increased!');
+        } else {
+          setMessage(`❌ Error: ${result.error}`);
+        }
+      } else {
+        setMessage('🌐 Running in browser mode - Electron features disabled');
+      }
+    } catch (error) {
+      setMessage(`❌ Error: ${error}`);
+    }
+    setIsLoading(false);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleBreathingSlower = async () => {
+    setIsLoading(true);
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.breathingSpeed('slower');
+        if (result.success) {
+          setMessage('✅ Breathing speed decreased!');
+        } else {
+          setMessage(`❌ Error: ${result.error}`);
+        }
+      } else {
+        setMessage('🌐 Running in browser mode - Electron features disabled');
+      }
+    } catch (error) {
+      setMessage(`❌ Error: ${error}`);
+    }
+    setIsLoading(false);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleToggleLightStyle = async () => {
+    setIsLoading(true);
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.toggleLightStyle();
+        if (result.success) {
+          setMessage('✅ Light style toggled!');
+        } else {
+          setMessage(`❌ Error: ${result.error}`);
+        }
+      } else {
+        setMessage('🌐 Running in browser mode - Electron features disabled');
+      }
+    } catch (error) {
+      setMessage(`❌ Error: ${error}`);
+    }
+    setIsLoading(false);
+    setTimeout(() => setMessage(''), 3000);
   };
 
   // Safe config loading
@@ -33,8 +109,9 @@ const config = (window as any).config?.get?.() || {};
           <h2 className="text-3xl font-bold text-white mb-6 text-center">🎮 Control Panel</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <button
-              onClick={() => handleControlFunction('Color Change (Fn + End)')}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              onClick={handleChangeColor}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="text-2xl mb-2">🎨</div>
               <div className="text-xl font-bold">Change Color</div>
@@ -42,8 +119,9 @@ const config = (window as any).config?.get?.() || {};
             </button>
             
             <button
-              onClick={() => handleControlFunction('Breathing Effect - Speed Up (Fn + Right Arrow)')}
-              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              onClick={handleBreathingFaster}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="text-2xl mb-2">💨</div>
               <div className="text-xl font-bold">Breathing Faster</div>
@@ -51,8 +129,9 @@ const config = (window as any).config?.get?.() || {};
             </button>
             
             <button
-              onClick={() => handleControlFunction('Breathing Effect - Slow Down (Fn + Left Arrow)')}
-              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              onClick={handleBreathingSlower}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="text-2xl mb-2">🌊</div>
               <div className="text-xl font-bold">Breathing Slower</div>
@@ -60,8 +139,9 @@ const config = (window as any).config?.get?.() || {};
             </button>
             
             <button
-              onClick={() => handleControlFunction('Toggle Light Style')}
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              onClick={handleToggleLightStyle}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-8 px-8 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="text-2xl mb-2">💡</div>
               <div className="text-xl font-bold">Toggle Light Style</div>
