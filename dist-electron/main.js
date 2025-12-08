@@ -79,8 +79,8 @@ var __dirname = (0, path_1.dirname)(__filename);
 var mainWindow = null;
 var HID = null;
 // Aula F99 Pro USB IDs (from KB.ini)
-var AULA_VID = 0x258a;
-var AULA_PID = 0x010C;
+var AULA_VID = 0x1a2c;
+var AULA_PID = 0x4b64;
 // Current lighting state
 var currentColor = 0;
 var currentSpeed = 2;

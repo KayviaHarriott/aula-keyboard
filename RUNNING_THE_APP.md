@@ -76,8 +76,8 @@ On macOS, you may need to grant permissions:
 1. **Keyboard Not Detected**:
    - Make sure Aula F99 Pro is connected via USB
    - Check if it shows up in System Information > USB
-   - VID should be: `0x258a`
-   - PID should be: `0x010C`
+   - VID should be: `0x1a2c`
+   - PID should be: `0x4b64`
 
 2. **Commands Not Working**:
    - The USB HID commands are based on standard protocols

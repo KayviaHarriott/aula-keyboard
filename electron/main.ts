@@ -12,8 +12,8 @@ let mainWindow: BrowserWindow | null = null;
 let HID: any = null;
 
 // Aula F99 Pro USB IDs (from KB.ini)
-const AULA_VID = 0x258a;
-const AULA_PID = 0x010C;
+const AULA_VID = 0x1a2c;
+const AULA_PID = 0x4b64;
 
 // Current lighting state
 let currentColor = 0;
