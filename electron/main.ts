@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import HID from 'node-hid';
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -10,8 +11,14 @@ const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 
-// Path to cfg.ini file
-const CFG_PATH = path.join(__dirname, '../resources/cfg.ini');
+// Aula F99 Pro USB IDs (from KB.ini)
+const AULA_VID = 0x258a;
+const AULA_PID = 0x010C;
+
+// Current lighting state
+let currentColor = 0;
+let currentSpeed = 2;
+let currentMode = 0;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -53,137 +60,152 @@ app.on('window-all-closed', () => {
   }
 });
 
-// IPC Handlers for keyboard control
+// Helper functions for USB communication
 
-// Read cfg.ini file
-ipcMain.handle('read-config', async () => {
+function findAulaKeyboard() {
   try {
-    if (fs.existsSync(CFG_PATH)) {
-      const content = fs.readFileSync(CFG_PATH, 'utf-8');
-      return { success: true, data: content };
-    } else {
-      return { success: false, error: 'Config file not found' };
-    }
+    const devices = HID.devices();
+    const keyboard = devices.find(d => d.vendorId === AULA_VID && d.productId === AULA_PID);
+    return keyboard;
   } catch (error) {
-    return { success: false, error: String(error) };
+    console.error('Error finding keyboard:', error);
+    return null;
   }
-});
+}
 
-// Write to cfg.ini file
-ipcMain.handle('write-config', async (_event, content: string) => {
+function sendCommandToKeyboard(data: number[]) {
   try {
-    const dir = path.dirname(CFG_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    const deviceInfo = findAulaKeyboard();
+    if (!deviceInfo || !deviceInfo.path) {
+      return { success: false, error: 'Keyboard not found' };
     }
-    fs.writeFileSync(CFG_PATH, content, 'utf-8');
+
+    const device = new HID.HID(deviceInfo.path);
+    
+    // Prepare the command packet (typically 64 bytes for HID)
+    const packet = new Array(64).fill(0);
+    data.forEach((byte, index) => {
+      if (index < packet.length) {
+        packet[index] = byte;
+      }
+    });
+
+    device.write(packet);
+    device.close();
+    
     return { success: true };
   } catch (error) {
+    console.error('Error sending command:', error);
     return { success: false, error: String(error) };
   }
-});
+}
 
-// Change keyboard color
-ipcMain.handle('change-color', async (_event, colorIndex?: number) => {
+// IPC Handlers for keyboard control using USB HID
+
+// Detect keyboard
+ipcMain.handle('detect-keyboard', async () => {
   try {
-    // Read current config
-    const configContent = fs.readFileSync(CFG_PATH, 'utf-8');
-    const lines = configContent.split('\n');
-    
-    // Parse and modify color settings
-    let modified = false;
-    const newLines = lines.map(line => {
-      // Look for color-related settings in cfg.ini
-      if (line.includes('color') || line.includes('Color') || line.includes('rgb')) {
-        modified = true;
-        // If colorIndex is provided, set specific color
-        if (colorIndex !== undefined) {
-          return line.replace(/=\s*\d+/, `=${colorIndex}`);
+    const keyboard = findAulaKeyboard();
+    if (keyboard) {
+      return { 
+        success: true, 
+        keyboard: {
+          manufacturer: keyboard.manufacturer,
+          product: keyboard.product,
+          vendorId: keyboard.vendorId,
+          productId: keyboard.productId
         }
-        // Otherwise cycle to next color
-        const match = line.match(/=\s*(\d+)/);
-        if (match) {
-          const currentValue = parseInt(match[1]);
-          const nextValue = (currentValue + 1) % 16; // Assuming 16 colors
-          return line.replace(/=\s*\d+/, `=${nextValue}`);
-        }
-      }
-      return line;
-    });
-
-    if (modified) {
-      fs.writeFileSync(CFG_PATH, newLines.join('\n'), 'utf-8');
-      return { success: true, message: 'Color changed' };
+      };
     } else {
-      return { success: false, error: 'No color setting found in config' };
+      return { success: false, error: 'Aula F99 Pro keyboard not found. Make sure it\'s connected.' };
     }
   } catch (error) {
     return { success: false, error: String(error) };
   }
 });
 
-// Breathing effect speed
+// Change keyboard color using USB commands
+// Based on common mechanical keyboard protocols
+ipcMain.handle('change-color', async () => {
+  try {
+    // Cycle to next color
+    currentColor = (currentColor + 1) % 7; // 7 colors: Red, Green, Blue, Yellow, Cyan, Magenta, White
+    
+    // Standard color command format for mechanical keyboards
+    // Header: 0x07, Command: 0x02 (set color), Color index, Footer
+    const command = [
+      0x07,          // Report ID / Header
+      0x02,          // Command: Set Color
+      0x03,          // Sub-command
+      currentColor,  // Color index
+      0x00, 0x00, 0x00, 0x00 // Padding
+    ];
+    
+    const result = sendCommandToKeyboard(command);
+    if (result.success) {
+      return { success: true, message: `Color changed to ${['Red', 'Green', 'Blue', 'Yellow', 'Cyan', 'Magenta', 'White'][currentColor]}` };
+    } else {
+      return result;
+    }
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+// Breathing effect speed control
 ipcMain.handle('breathing-speed', async (_event, direction: 'faster' | 'slower') => {
   try {
-    const configContent = fs.readFileSync(CFG_PATH, 'utf-8');
-    const lines = configContent.split('\n');
-    
-    let modified = false;
-    const newLines = lines.map(line => {
-      // Look for breathing/speed settings
-      if (line.includes('breath') || line.includes('speed') || line.includes('Speed')) {
-        modified = true;
-        const match = line.match(/=\s*(\d+)/);
-        if (match) {
-          let currentValue = parseInt(match[1]);
-          if (direction === 'faster') {
-            currentValue = Math.min(currentValue + 1, 10); // Max speed 10
-          } else {
-            currentValue = Math.max(currentValue - 1, 1); // Min speed 1
-          }
-          return line.replace(/=\s*\d+/, `=${currentValue}`);
-        }
-      }
-      return line;
-    });
-
-    if (modified) {
-      fs.writeFileSync(CFG_PATH, newLines.join('\n'), 'utf-8');
-      return { success: true, message: `Breathing ${direction}` };
+    if (direction === 'faster') {
+      currentSpeed = Math.min(currentSpeed + 1, 4); // Max speed 4
     } else {
-      return { success: false, error: 'No breathing setting found in config' };
+      currentSpeed = Math.max(currentSpeed - 1, 0); // Min speed 0
+    }
+    
+    // Standard speed command for mechanical keyboards
+    const command = [
+      0x07,          // Report ID / Header
+      0x03,          // Command: Set Speed
+      0x02,          // Sub-command
+      currentSpeed,  // Speed value
+      0x00, 0x00, 0x00, 0x00 // Padding
+    ];
+    
+    const result = sendCommandToKeyboard(command);
+    if (result.success) {
+      return { success: true, message: `Breathing speed ${direction}: Level ${currentSpeed}` };
+    } else {
+      return result;
     }
   } catch (error) {
     return { success: false, error: String(error) };
   }
 });
 
-// Toggle light style
+// Toggle light style/mode
 ipcMain.handle('toggle-light-style', async () => {
   try {
-    const configContent = fs.readFileSync(CFG_PATH, 'utf-8');
-    const lines = configContent.split('\n');
+    // Cycle through lighting modes
+    // Modes: 0=Static, 1=Breathing, 2=Wave, 3=Rainbow, 4=Reactive, etc.
+    currentMode = (currentMode + 1) % 18; // 18 modes based on KB.ini LedOpt entries
     
-    let modified = false;
-    const newLines = lines.map(line => {
-      // Look for light mode/style settings
-      if (line.includes('mode') || line.includes('style') || line.includes('effect')) {
-        modified = true;
-        const match = line.match(/=\s*(\d+)/);
-        if (match) {
-          const currentValue = parseInt(match[1]);
-          const nextValue = (currentValue + 1) % 8; // Assuming 8 different styles
-          return line.replace(/=\s*\d+/, `=${nextValue}`);
-        }
-      }
-      return line;
-    });
-
-    if (modified) {
-      fs.writeFileSync(CFG_PATH, newLines.join('\n'), 'utf-8');
-      return { success: true, message: 'Light style toggled' };
+    // Standard mode command
+    const command = [
+      0x07,         // Report ID / Header
+      0x04,         // Command: Set Mode
+      0x01,         // Sub-command
+      currentMode,  // Mode index
+      currentSpeed, // Speed
+      currentColor, // Color
+      0x00, 0x00    // Padding
+    ];
+    
+    const modeNames = ['Static', 'Breathing', 'Wave', 'Rainbow', 'Reactive', 'Ripple', 'Neon', 'Starry', 'Laser', 'Raindrop', 'Custom 1', 'Custom 2', 'Custom 3', 'Custom 4', 'Custom 5', 'Custom 6', 'Custom 7', 'Custom 8'];
+    
+    const result = sendCommandToKeyboard(command);
+    if (result.success) {
+      return { success: true, message: `Mode: ${modeNames[currentMode] || `Mode ${currentMode}`}` };
     } else {
-      return { success: false, error: 'No style setting found in config' };
+      return result;
     }
   } catch (error) {
     return { success: false, error: String(error) };

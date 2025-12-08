@@ -1,6 +1,5 @@
 export interface ElectronAPI {
-  readConfig: () => Promise<{ success: boolean; data?: string; error?: string }>;
-  writeConfig: (content: string) => Promise<{ success: boolean; error?: string }>;
+  detectKeyboard: () => Promise<{ success: boolean; keyboard?: any; error?: string }>;
   changeColor: (colorIndex?: number) => Promise<{ success: boolean; message?: string; error?: string }>;
   breathingSpeed: (direction: 'faster' | 'slower') => Promise<{ success: boolean; message?: string; error?: string }>;
   toggleLightStyle: () => Promise<{ success: boolean; message?: string; error?: string }>;

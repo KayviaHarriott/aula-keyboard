@@ -1,8 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const Home = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [keyboardDetected, setKeyboardDetected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const detectKeyboard = async () => {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.detectKeyboard();
+        setKeyboardDetected(result.success);
+        if (!result.success) {
+          setMessage(`⚠️ ${result.error}`);
+        } else {
+          setMessage(`✅ ${result.keyboard?.product || 'Aula F99 Pro'} detected!`);
+          setTimeout(() => setMessage(''), 3000);
+        }
+      }
+    };
+    detectKeyboard();
+  }, []);
 
   const handleChangeColor = async () => {
     setIsLoading(true);
@@ -10,9 +27,9 @@ export const Home = () => {
       if (window.electronAPI) {
         const result = await window.electronAPI.changeColor();
         if (result.success) {
-          setMessage('✅ Color changed successfully!');
+          setMessage(`✅ ${result.message || 'Color changed successfully!'}`);
         } else {
-          setMessage(`❌ Error: ${result.error}`);
+          setMessage(`❌ ${result.error}`);
         }
       } else {
         setMessage('🌐 Running in browser mode - Electron features disabled');
@@ -30,9 +47,9 @@ export const Home = () => {
       if (window.electronAPI) {
         const result = await window.electronAPI.breathingSpeed('faster');
         if (result.success) {
-          setMessage('✅ Breathing speed increased!');
+          setMessage(`✅ ${result.message || 'Breathing speed increased!'}`);
         } else {
-          setMessage(`❌ Error: ${result.error}`);
+          setMessage(`❌ ${result.error}`);
         }
       } else {
         setMessage('🌐 Running in browser mode - Electron features disabled');
@@ -50,9 +67,9 @@ export const Home = () => {
       if (window.electronAPI) {
         const result = await window.electronAPI.breathingSpeed('slower');
         if (result.success) {
-          setMessage('✅ Breathing speed decreased!');
+          setMessage(`✅ ${result.message || 'Breathing speed decreased!'}`);
         } else {
-          setMessage(`❌ Error: ${result.error}`);
+          setMessage(`❌ ${result.error}`);
         }
       } else {
         setMessage('🌐 Running in browser mode - Electron features disabled');
@@ -70,9 +87,9 @@ export const Home = () => {
       if (window.electronAPI) {
         const result = await window.electronAPI.toggleLightStyle();
         if (result.success) {
-          setMessage('✅ Light style toggled!');
+          setMessage(`✅ ${result.message || 'Light style toggled!'}`);
         } else {
-          setMessage(`❌ Error: ${result.error}`);
+          setMessage(`❌ ${result.error}`);
         }
       } else {
         setMessage('🌐 Running in browser mode - Electron features disabled');
