@@ -9,7 +9,7 @@
     "build:electron": "tsc -b && vite build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron:start": "NODE_ENV=development electron electron/main.js",
+    "electron:start": "NODE_ENV=development electron electron/main.cjs",
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && npm run electron:start\"",
     "dist": "electron-builder"
   },
