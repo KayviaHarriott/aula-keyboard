@@ -13,7 +13,7 @@
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && npm run electron:start\"",
     "dist": "electron-builder"
   },
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
     "node-hid": "^3.2.0",

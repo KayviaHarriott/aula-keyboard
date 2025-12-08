@@ -1,37 +1,25 @@
-const { contextBridge } = require("electron");
-const fs = require("fs");
-const path = require("path");
+const { contextBridge, ipcRenderer } = require('electron');
 
-function parseIni(data) {
-  const result = {};
-  const lines = data.split(/\r?\n/);
-  for (let line of lines) {
-    line = line.trim();
-    if (!line || line.startsWith(";")) continue;
-    const [key, value] = line.split("=", 2);
-    if (key && value !== undefined) result[key.trim()] = value.trim();
-  }
-  return result;
-}
+console.log('Preload script loading...');
 
-function loadConfig() {
-  // Vite dev path (your real project root)
-  const devPath = path.join(__dirname, "..", "resources", "Cfg.ini");
+// Expose electronAPI to the renderer process
+contextBridge.exposeInMainWorld('electronAPI', {
+  detectKeyboard: () => {
+    console.log('Preload: detectKeyboard called');
+    return ipcRenderer.invoke('detect-keyboard');
+  },
+  changeColor: (colorIndex) => {
+    console.log('Preload: changeColor called');
+    return ipcRenderer.invoke('change-color', colorIndex);
+  },
+  breathingSpeed: (direction) => {
+    console.log('Preload: breathingSpeed called with direction:', direction);
+    return ipcRenderer.invoke('breathing-speed', direction);
+  },
+  toggleLightStyle: () => {
+    console.log('Preload: toggleLightStyle called');
+    return ipcRenderer.invoke('toggle-light-style');
+  },
+});
 
-  // Production path (inside app bundle)
-  const prodPath = path.join(process.resourcesPath, "resources", "Cfg.ini");
-
-  let filePath = null;
-
-  if (fs.existsSync(devPath)) {
-    filePath = devPath;
-  } else if (fs.existsSync(prodPath)) {
-    filePath = prodPath;
-  } else {
-    console.error("❌ Cfg.ini NOT FOUND at:", devPath, "or", prodPath);
-    return {};
-  }
-
-  const file = fs.readFileSync(filePath, "utf-8");
-  return parseIni(file);
-}
+console.log('✅ electronAPI exposed to window object');
