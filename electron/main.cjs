@@ -59,7 +59,38 @@ app.on('window-all-closed', () => {
 function findAulaKeyboard() {
   try {
     const devices = HID.devices();
-    const keyboard = devices.find(d => d.vendorId === AULA_VID && d.productId === AULA_PID);
+    
+    // Find all Aula keyboards
+    const keyboards = devices.filter(d => d.vendorId === AULA_VID && d.productId === AULA_PID);
+    
+    if (keyboards.length === 0) {
+      return null;
+    }
+    
+    // On macOS/Linux, keyboards have multiple interfaces
+    // We want the one that supports Feature Reports (usually interface 0 or usage page 0xFF00)
+    // Try to find the right interface:
+    
+    // 1. Prefer interface with usagePage 0xFF00 or 0xFF01 (vendor-specific)
+    let keyboard = keyboards.find(d => d.usagePage === 0xFF00 || d.usagePage === 0xFF01);
+    
+    // 2. Fall back to interface 0
+    if (!keyboard) {
+      keyboard = keyboards.find(d => d.interface === 0);
+    }
+    
+    // 3. Fall back to first device
+    if (!keyboard) {
+      keyboard = keyboards[0];
+    }
+    
+    console.log('Selected keyboard interface:', {
+      interface: keyboard.interface,
+      usagePage: '0x' + (keyboard.usagePage || 0).toString(16),
+      usage: '0x' + (keyboard.usage || 0).toString(16),
+      path: keyboard.path
+    });
+    
     return keyboard;
   } catch (error) {
     console.error('Error finding keyboard:', error);
@@ -79,11 +110,30 @@ function calculateCRC(data) {
 function sendCommandToKeyboard(data) {
   try {
     const deviceInfo = findAulaKeyboard();
-    if (!deviceInfo || !deviceInfo.path) {
+    if (!deviceInfo) {
       return { success: false, error: 'Keyboard not found' };
     }
 
-    const device = new HID.HID(deviceInfo.path);
+    // macOS fix: Open by VID/PID instead of path
+    // macOS uses special paths like "DevSrvsID:xxx" which node-hid can't open directly
+    let device;
+    try {
+      // Try opening by path first (works on Windows/Linux)
+      if (deviceInfo.path && !deviceInfo.path.includes('DevSrvsID')) {
+        console.log('Opening by path:', deviceInfo.path);
+        device = new HID.HID(deviceInfo.path);
+      } else {
+        // macOS: Open by VID/PID
+        console.log('Opening by VID/PID:', '0x' + AULA_VID.toString(16), '0x' + AULA_PID.toString(16));
+        device = new HID.HID(AULA_VID, AULA_PID);
+      }
+    } catch (err) {
+      // Fallback: Try by VID/PID
+      console.log('Fallback: Opening by VID/PID after error:', err.message);
+      device = new HID.HID(AULA_VID, AULA_PID);
+    }
+    
+    console.log('✅ Device opened successfully!');
     
     // Build packet based on KB.ini protocol structure
     // Psd=3,0,0,0,0,9A means: [reportId=3, 0x00, 0x00, 0x00, 0x00, 0x9A, ...payload, CRC]
