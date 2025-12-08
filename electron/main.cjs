@@ -67,6 +67,15 @@ function findAulaKeyboard() {
   }
 }
 
+function calculateCRC(data) {
+  // Simple XOR checksum as per Aula protocol
+  let crc = 0;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+  }
+  return crc;
+}
+
 function sendCommandToKeyboard(data) {
   try {
     const deviceInfo = findAulaKeyboard();
@@ -76,16 +85,34 @@ function sendCommandToKeyboard(data) {
 
     const device = new HID.HID(deviceInfo.path);
     
-    // Prepare the command packet (64 bytes for HID)
+    // Build packet based on KB.ini protocol structure
+    // Psd=3,0,0,0,0,9A means: [reportId=3, 0x00, 0x00, 0x00, 0x00, 0x9A, ...payload, CRC]
     const packet = new Array(64).fill(0);
+    
+    // Header from KB.ini
+    packet[0] = 0x03;  // Report ID (from Psd line)
+    packet[1] = 0x00;
+    packet[2] = 0x00;
+    packet[3] = 0x00;
+    packet[4] = 0x00;
+    packet[5] = 0x9A;  // Protocol signature
+    
+    // Insert command data starting at position 6
     data.forEach((byte, index) => {
-      if (index < packet.length) {
-        packet[index] = byte;
+      if (index + 6 < packet.length - 1) {  // Leave last byte for CRC
+        packet[index + 6] = byte;
       }
     });
-
-    device.write(packet);
+    
+    // Calculate and add CRC at the end (as per CRC=1 in KB.ini)
+    const dataForCRC = packet.slice(0, 63);
+    packet[63] = calculateCRC(dataForCRC);
+    
+    // Use sendFeatureReport instead of write (as per HidD_SetFeature in OemDrv.exe)
+    device.sendFeatureReport(packet);
     device.close();
+    
+    console.log('Sent packet:', packet.slice(0, 20).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     
     return { success: true };
   } catch (error) {
@@ -118,20 +145,27 @@ ipcMain.handle('detect-keyboard', async () => {
   }
 });
 
-// Change color
+// Change color (Fn + End)
 ipcMain.handle('change-color', async () => {
   try {
     currentColor = (currentColor + 1) % 7;
     
+    // Based on KB.ini LedOpt structure: effect, speed, light, direction, random, color
+    // Command format: [CMD, SUBCMD, EFFECT_ID, COLOR, SPEED, BRIGHTNESS, ...]
     const command = [
-      0x07, 0x02, 0x03, currentColor,
-      0x00, 0x00, 0x00, 0x00
+      0x0E,           // LED command type
+      0x01,           // Set color subcommand
+      currentMode,    // Current effect mode
+      currentColor,   // RGB color index (0-6)
+      currentSpeed,   // Speed level (0-4)
+      0x04,           // Brightness level (max)
+      0x00, 0x00      // Padding
     ];
     
     const result = sendCommandToKeyboard(command);
     if (result.success) {
       const colors = ['Red', 'Green', 'Blue', 'Yellow', 'Cyan', 'Magenta', 'White'];
-      return { success: true, message: `Color changed to ${colors[currentColor]}` };
+      return { success: true, message: `✅ Color: ${colors[currentColor]}` };
     } else {
       return result;
     }
@@ -140,7 +174,7 @@ ipcMain.handle('change-color', async () => {
   }
 });
 
-// Breathing speed
+// Breathing speed (Fn + Left/Right Arrow)
 ipcMain.handle('breathing-speed', async (_event, direction) => {
   try {
     if (direction === 'faster') {
@@ -149,14 +183,22 @@ ipcMain.handle('breathing-speed', async (_event, direction) => {
       currentSpeed = Math.max(currentSpeed - 1, 0);
     }
     
+    // Update speed while keeping current color and mode
+    // Based on KB.ini: Speed=0,1,2,3,4 (5 levels)
     const command = [
-      0x07, 0x03, 0x02, currentSpeed,
-      0x00, 0x00, 0x00, 0x00
+      0x0E,           // LED command type
+      0x02,           // Set speed subcommand
+      currentMode,    // Current effect mode
+      currentColor,   // Keep current color
+      currentSpeed,   // New speed level (0-4)
+      0x04,           // Brightness
+      0x00, 0x00      // Padding
     ];
     
     const result = sendCommandToKeyboard(command);
     if (result.success) {
-      return { success: true, message: `Breathing speed ${direction}: Level ${currentSpeed}` };
+      const speedNames = ['Very Slow', 'Slow', 'Medium', 'Fast', 'Very Fast'];
+      return { success: true, message: `✅ Speed: ${speedNames[currentSpeed]} (${currentSpeed}/4)` };
     } else {
       return result;
     }
@@ -170,16 +212,30 @@ ipcMain.handle('toggle-light-style', async () => {
   try {
     currentMode = (currentMode + 1) % 18;
     
+    // Based on KB.ini LedOpt1-LedOpt18 (18 modes)
+    // LedOpt format: effect, hw_effect, speed_enabled, light_enabled, direction, random, color_enabled
     const command = [
-      0x07, 0x04, 0x01, currentMode,
-      currentSpeed, currentColor, 0x00, 0x00
+      0x0E,           // LED command type
+      0x03,           // Set mode subcommand
+      currentMode,    // Mode ID (0-17, maps to LedOpt1-LedOpt18)
+      currentColor,   // Color
+      currentSpeed,   // Speed
+      0x04,           // Brightness
+      0x01,           // Direction (forward)
+      0x00            // Padding
     ];
     
-    const modeNames = ['Static', 'Breathing', 'Wave', 'Rainbow', 'Reactive', 'Ripple', 'Neon', 'Starry', 'Laser', 'Raindrop', 'Custom 1', 'Custom 2', 'Custom 3', 'Custom 4', 'Custom 5', 'Custom 6', 'Custom 7', 'Custom 8'];
+    // Mode names based on KB.ini LedOpt comments
+    const modeNames = [
+      'Static', 'Breathing', 'Wave', 'Reactive', 'Ripple',
+      'Rainbow Wave', 'Neon', 'Starry', 'Laser', 'Raindrop',
+      'Gradient', 'Flash', 'Trigger', 'Fire', 'Aurora',
+      'Custom 1', 'Custom 2', 'Custom 3'
+    ];
     
     const result = sendCommandToKeyboard(command);
     if (result.success) {
-      return { success: true, message: `Mode: ${modeNames[currentMode] || `Mode ${currentMode}`}` };
+      return { success: true, message: `✅ Mode: ${modeNames[currentMode]}` };
     } else {
       return result;
     }
