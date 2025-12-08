@@ -5,8 +5,9 @@ const HID = require('node-hid');
 let mainWindow = null;
 
 // Aula F99 Pro USB IDs
-const AULA_VID = 0x1a2c;
-const AULA_PID = 0x4b64;
+// Note: Your specific keyboard variant uses these IDs
+const AULA_VID = 0x258a;
+const AULA_PID = 0x010c;
 
 // Current lighting state
 let currentColor = 0;
