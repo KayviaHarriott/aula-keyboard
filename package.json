@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "vite",
     "build": "tsc -b && vite build",
     "build:electron": "tsc -b && vite build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron": "electron .",
-    "electron-dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && npm run electron\"",
+    "electron:start": "NODE_ENV=development electron electron/main.js",
+    "electron:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && npm run electron:start\"",
     "dist": "electron-builder"
   },
+  "main": "electron/main.js",
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
     "node-hid": "^3.2.0",
